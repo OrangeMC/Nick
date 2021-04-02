@@ -7,6 +7,7 @@ import moe.orangemc.orangeroot.perms.enumeration.Group;
 import org.bukkit.entity.Player;
 
 public class NickManagerImpl implements NickManager {
+
     @Override
     public String getNick(Player player) {
         return null;
