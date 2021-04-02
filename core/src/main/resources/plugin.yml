@@ -3,3 +3,8 @@ version: ${project.version}
 main: moe.orangemc.nick.Nick
 api-version: 1.16
 authors: [ Lucky_fish0w0 ]
+
+depend:
+  - ProtocolLib
+softdepend:
+  - ViaBackwards
