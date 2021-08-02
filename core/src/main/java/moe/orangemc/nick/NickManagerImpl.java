@@ -4,10 +4,9 @@ import moe.orangemc.nick.api.NickManager;
 import moe.orangemc.nick.api.SkinProperty;
 import moe.orangemc.nick.database.NickDatabase;
 import moe.orangemc.nick.skin.SkinHelper;
+import moe.orangemc.nick.util.NameTagUpdater;
 
 import org.bukkit.entity.Player;
-
-import java.io.IOException;
 
 public class NickManagerImpl implements NickManager {
     private final NickDatabase nickDatabase = NickPlugin.getNickDatabase();
@@ -24,18 +23,21 @@ public class NickManagerImpl implements NickManager {
 
     @Override
     public void resetNick(Player player) {
+        String originName = nickDatabase.getOriginName(player.getUniqueId());
         nickDatabase.resetNick(player.getUniqueId());
         player.setPlayerListName(null);
         player.setDisplayName(null);
         try {
-            SkinHelper.downloadAndApplyLocalSkin(player, player.getName());
-        } catch (IOException e) {
+            SkinHelper.downloadAndApplyLocalSkin(player, originName);
+        } catch (Exception e) {
             try {
-                SkinHelper.downloadAndApplyMojangSkin(player, player.getName());
-            } catch (IOException ex) {
+                SkinHelper.downloadAndApplyMojangSkin(player, originName);
+            } catch (Exception ex) {
+                ex.addSuppressed(e);
                 ex.printStackTrace();
             }
         }
+        NameTagUpdater.setPlayerNameTag(player, originName);
     }
 
     @Override
@@ -48,17 +50,17 @@ public class NickManagerImpl implements NickManager {
         player.setDisplayName(nick);
         try {
             SkinHelper.downloadAndApplyLocalSkin(player, nick);
-        } catch (IOException e) {
+        } catch (Exception e) {
             try {
                 SkinHelper.downloadAndApplyMojangSkin(player, nick);
-            } catch (IOException ex) {
+            } catch (Exception ex) {
+                ex.addSuppressed(e);
                 ex.printStackTrace();
             }
         }
-
         if (save) {
-            NickPlugin.getNickDatabase().setNick(player.getUniqueId(), nick);
+            NickPlugin.getNickDatabase().setNick(player.getUniqueId(), nick, player.getName());
         }
+        NameTagUpdater.setPlayerNameTag(player, nick);
     }
-
 }

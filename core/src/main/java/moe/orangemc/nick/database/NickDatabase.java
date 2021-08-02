@@ -20,13 +20,14 @@ public class NickDatabase {
         mongoDatabase = mongoClient.getDatabase("orangemc");
     }
 
-    public void setNick(UUID playerUid, String nick) {
+    public void setNick(UUID playerUid, String nick, String originName) {
         MongoCollection<Document> collection = mongoDatabase.getCollection("nick");
         Document selector = new Document("uuid", playerUid);
         boolean has = collection.find(selector).first() != null;
         Map<String, Object> data = new HashMap<>();
         data.put("uuid", playerUid);
         data.put("nick", nick);
+        data.put("originName", originName);
         if (has) {
             BasicDBObject setData = new BasicDBObject("$set", new Document(data));
             collection.updateOne(selector, setData);
@@ -43,6 +44,16 @@ public class NickDatabase {
             return null;
         }
         return doc.getString("nick");
+    }
+
+    public String getOriginName(UUID playerUid) {
+        MongoCollection<Document> collection = mongoDatabase.getCollection("nick");
+        Document selector = new Document("uuid", playerUid);
+        Document doc = collection.find(selector).first();
+        if (doc == null) {
+            return null;
+        }
+        return doc.getString("originName");
     }
 
     public void resetNick(UUID playerUid) {

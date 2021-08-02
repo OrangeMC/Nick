@@ -1,0 +1,4 @@
+{
+  "command.nick.usage": "Usage：/nick <nickname|reset>",
+  "command.nick.successful": "Successfully updated your nickname"
+}

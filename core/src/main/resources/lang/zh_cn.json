@@ -1,4 +1,4 @@
 {
-  "command.nick.usage": "用法：/nick <玩家名|reset>",
+  "command.nick.usage": "用法：/nick <昵称|reset>",
   "command.nick.successful": "已成功替换你的昵称"
 }

@@ -95,5 +95,10 @@
             <version>5.3</version>
             <scope>provided</scope>
         </dependency>
+        <dependency>
+            <groupId>io.github.karlatemp</groupId>
+            <artifactId>unsafe-accessor</artifactId>
+            <version>1.6.0</version>
+        </dependency>
     </dependencies>
 </project>

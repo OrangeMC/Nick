@@ -12,3 +12,8 @@ softdepend:
 commands:
   nick:
     description: change your nickname
+    permission: nick.command
+
+permissions:
+  nick.command:
+    default: op
