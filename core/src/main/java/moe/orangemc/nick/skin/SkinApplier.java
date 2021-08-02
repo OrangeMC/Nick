@@ -5,12 +5,10 @@ import com.comphenix.protocol.ProtocolLibrary;
 import com.comphenix.protocol.ProtocolManager;
 import com.comphenix.protocol.events.PacketContainer;
 import com.comphenix.protocol.wrappers.EnumWrappers;
-import com.comphenix.protocol.wrappers.PlayerInfoData;
-import com.comphenix.protocol.wrappers.WrappedChatComponent;
-import com.comphenix.protocol.wrappers.WrappedGameProfile;
-import moe.orangemc.luckyfish.plugincommons.utils.ReflectionUtil;
+import com.google.common.hash.Hashing;
 import moe.orangemc.nick.NickPlugin;
 import moe.orangemc.nick.api.SkinProperty;
+import moe.orangemc.plugincommons.utils.ReflectionUtil;
 import nl.matsv.viabackwards.protocol.protocol1_15_2to1_16.Protocol1_15_2To1_16;
 import us.myles.ViaVersion.api.PacketWrapper;
 import us.myles.ViaVersion.api.Via;
@@ -25,9 +23,8 @@ import org.bukkit.WorldType;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 public class SkinApplier {
     private final Class<?> propertyClass;
@@ -91,10 +88,12 @@ public class SkinApplier {
             }
         });
 
-        for (Player pl : Bukkit.getOnlinePlayers()) {
-            pl.hidePlayer(NickPlugin.getInstance(), p);
-            pl.showPlayer(NickPlugin.getInstance(), p);
-        }
+        Bukkit.getScheduler().scheduleSyncDelayedTask(NickPlugin.getInstance(), () -> {
+            for (Player pl : Bukkit.getOnlinePlayers()) {
+                pl.hidePlayer(NickPlugin.getInstance(), p);
+                pl.showPlayer(NickPlugin.getInstance(), p);
+            }
+        });
 
         refreshPlayer(p);
     }
@@ -102,25 +101,35 @@ public class SkinApplier {
     @SuppressWarnings("unchecked")
     private void refreshPlayer(Player p) {
         try {
-            PlayerInfoData playerInfoData = new PlayerInfoData(new WrappedGameProfile(p.getUniqueId(), p.getName()), 0, EnumWrappers.NativeGameMode.fromBukkit(p.getGameMode()), WrappedChatComponent.fromText(p.getDisplayName()));
-            List<PlayerInfoData> playerInfoDataList = new ArrayList<>();
-            playerInfoDataList.add(playerInfoData);
+//            PlayerInfoData playerInfoData = new PlayerInfoData(WrappedGameProfile.fromPlayer(p), 0, EnumWrappers.NativeGameMode.fromBukkit(p.getGameMode()), WrappedChatComponent.fromText(p.getDisplayName()));
+//            List<PlayerInfoData> playerInfoDataList = new ArrayList<>();
+//            playerInfoDataList.add(playerInfoData);
+            Class<?> ppopi = Class.forName("net.minecraft.network.protocol.game.PacketPlayOutPlayerInfo");
+            Class<?> enumAction = Class.forName("net.minecraft.network.protocol.game.PacketPlayOutPlayerInfo$EnumPlayerInfoAction");
 
-            PacketContainer removePacket = new PacketContainer(PacketType.Play.Server.PLAYER_INFO);
-            removePacket.getPlayerInfoAction().write(0, EnumWrappers.PlayerInfoAction.REMOVE_PLAYER);
-            removePacket.getPlayerInfoDataLists().write(0, playerInfoDataList);
+            Enum<?> remove = ReflectionUtil.getEnum(enumAction, "REMOVE_PLAYER");
+            Enum<?> add = ReflectionUtil.getEnum(enumAction, "ADD_PLAYER");
 
-            PacketContainer addPacket = new PacketContainer(PacketType.Play.Server.PLAYER_INFO);
-            addPacket.getPlayerInfoAction().write(0, EnumWrappers.PlayerInfoAction.ADD_PLAYER);
-            addPacket.getPlayerInfoDataLists().write(0, playerInfoDataList);
+            List<?> ep = Arrays.asList(ReflectionUtil.invokeMethod(p, "getHandle"));
+            Object removePacket = ReflectionUtil.newInstance(ppopi, new Class[]{enumAction, Collection.class}, remove, ep);
+            Object addPacket = ReflectionUtil.newInstance(ppopi, new Class[]{enumAction, Collection.class}, add, ep);
+
+//            PacketContainer removePacket = new PacketContainer(PacketType.Play.Server.PLAYER_INFO);
+//            removePacket.getPlayerInfoAction().write(0, EnumWrappers.PlayerInfoAction.REMOVE_PLAYER);
+//            removePacket.getPlayerInfoDataLists().write(0, playerInfoDataList);
+//
+//            PacketContainer addPacket = new PacketContainer(PacketType.Play.Server.PLAYER_INFO);
+//            addPacket.getPlayerInfoAction().write(0, EnumWrappers.PlayerInfoAction.ADD_PLAYER);
+//            addPacket.getPlayerInfoDataLists().write(0, playerInfoDataList);
+
+            long seedEncrypted = Hashing.sha256().hashString(String.valueOf(p.getWorld().getSeed()), StandardCharsets.UTF_8).asLong();
 
             PacketContainer respawnPacket = new PacketContainer(PacketType.Play.Server.RESPAWN);
             respawnPacket.getDimensions().write(0, p.getWorld().getEnvironment().getId());
             respawnPacket.getWorldKeys().write(0, p.getWorld());
-            respawnPacket.getDifficulties().write(0, EnumWrappers.Difficulty.valueOf(p.getWorld().getDifficulty().name()));
             respawnPacket.getGameModes().write(0, EnumWrappers.NativeGameMode.fromBukkit(p.getGameMode()));
             respawnPacket.getGameModes().write(1, EnumWrappers.NativeGameMode.fromBukkit(p.getGameMode()));
-            respawnPacket.getLongs().write(0, 114514L);
+            respawnPacket.getLongs().write(0, seedEncrypted);
             respawnPacket.getBooleans().write(0, false).write(1, p.getWorld().getWorldType() == WorldType.FLAT).write(2, true);
 
             PacketContainer positionPacket = new PacketContainer(PacketType.Play.Server.POSITION);
@@ -129,22 +138,40 @@ public class SkinApplier {
                     .write(2, p.getLocation().getZ());
             positionPacket.getFloat().write(0, p.getLocation().getYaw())
                     .write(1, p.getLocation().getPitch());
-            positionPacket.getSets(EnumWrappers.getGenericConverter(null, (Class<Enum>) Class.forName("net.minecraft.server." + ReflectionUtil.getServerVersion() + ".PacketPlayOutPosition.EnumPlayerTeleportFlags"))).write(0, new HashSet<>());
+
+            Class<Enum> flagsClass;
+            try {
+                flagsClass = (Class<Enum>) Class.forName("net.minecraft.network.protocol.game.PacketPlayOutPosition$EnumPlayerTeleportFlags");
+            } catch (Exception e) {
+                try {
+                    flagsClass = (Class<Enum>) Class.forName("net.minecraft.server." + ReflectionUtil.getServerVersion() + ".PacketPlayOutPosition$EnumPlayerTeleportFlags");
+                } catch (Exception e1) {
+                    e1.addSuppressed(e);
+                    throw e1;
+                }
+            }
+            positionPacket.getSets(EnumWrappers.getGenericConverter(null, flagsClass)).write(0, new HashSet<>());
             positionPacket.getIntegers().write(0, 0);
+            positionPacket.getBooleans().write(0, false);
 
             PacketContainer slotPacket = new PacketContainer(PacketType.Play.Server.SET_SLOT);
-            positionPacket.getIntegers().write(0, p.getInventory().getHeldItemSlot());
+            slotPacket.getIntegers().write(0, p.getInventory().getHeldItemSlot());
 
-            pm.sendServerPacket(p, removePacket);
-            pm.sendServerPacket(p, addPacket);
+//            pm.sendServerPacket(p, removePacket);
+//            pm.sendServerPacket(p, addPacket);
+
+            Object playerConnection = ReflectionUtil.getField(ReflectionUtil.invokeMethod(p, "getHandle"), "b");
+            ReflectionUtil.invokeMethod(playerConnection, "sendPacket", new Class[]{Class.forName("net.minecraft.network.protocol.Packet")}, removePacket);
+            ReflectionUtil.invokeMethod(playerConnection, "sendPacket", new Class[]{Class.forName("net.minecraft.network.protocol.Packet")}, addPacket);
 
             boolean sendViaProtocolLib = true;
+
             if (useViaBackwards) {
                 UserConnection connection = Via.getManager().getConnection(p.getUniqueId());
                 if (connection != null && connection.getProtocolInfo() != null && connection.getProtocolInfo().getProtocolVersion() < ProtocolVersion.v1_16.getVersion()) {
                     PacketWrapper packet = new PacketWrapper(ClientboundPackets1_15.RESPAWN.ordinal(), null, connection);
                     packet.write(Type.INT, p.getWorld().getEnvironment().getId());
-                    packet.write(Type.LONG, 114514L);
+                    packet.write(Type.LONG, seedEncrypted);
                     packet.write(Type.UNSIGNED_BYTE, (short) p.getGameMode().getValue());
                     packet.write(Type.STRING, (boolean) ReflectionUtil.invokeMethod(ReflectionUtil.invokeMethod(p.getWorld(), "getHandle"), "isFlatWorld") ? "flat" : "default");
                     packet.send(Protocol1_15_2To1_16.class, true, true);

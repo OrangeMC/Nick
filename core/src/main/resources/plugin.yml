@@ -1,6 +1,6 @@
 name: Nick
 version: ${project.version}
-main: moe.orangemc.nick.Nick
+main: moe.orangemc.nick.NickPlugin
 api-version: 1.16
 authors: [ Lucky_fish0w0 ]
 
@@ -8,3 +8,7 @@ depend:
   - ProtocolLib
 softdepend:
   - ViaBackwards
+
+commands:
+  nick:
+    description: change your nickname
